@@ -6,14 +6,14 @@ import { Race, Reset, Board, Colors } from '../el'
 class Observer {
   readonly timestamp: number
   readonly color: string
-  ep: EventPoll
+  subject: Subject
   listener: number = 0
   callback: Function
 
-  constructor(callback: Function, instance: EventPoll) {
+  constructor(callback: Function, instance: Subject) {
     this.timestamp = Date.now()
-    this.ep = instance
-    this.color = Colors[this.ep.poll.length % 10]
+    this.subject = instance
+    this.color = Colors[instance.observers.length % 10]
     this.callback = callback
     this.creator()
   }
@@ -22,7 +22,7 @@ class Observer {
     Board.console(`${this.timestamp} 收到起跑指令，开始出击！</span>`, this.color)
     this.listener = window.setTimeout((t: string) => {
       Board.console(t, this.color)
-      this.ep.target = this.timestamp
+      this.subject.target = this.timestamp
     }, 10000 * Math.random(), `----- ${this.timestamp} 抵达终点！ ----`)
   }
 
@@ -35,32 +35,67 @@ class Observer {
 
   public succ(): void {
     Board.console(`***** ${this.timestamp} 获得奖牌！ *****`, this.color)
-    this.callback()
+    this.callback(this)
   }
 
 }
 
 
+class ObserverList {
+  private poll: Array<Observer> = []
 
-class EventPoll {
+  add(observer: Observer): void { this.poll.push(observer) }
+
+  remove(observer: Observer): void {
+    this.poll = this.poll.filter(ob => ob !== observer)
+  }
+
+  select(index: number): Observer { return this.poll[index] }
+
+  clean() {
+    while (this.poll.length > 0) {
+      const p: Observer = <Observer>this.poll.shift()
+      if (p.listener) { p.abort() }
+    }
+  }
+
+  get length() { return this.poll.length }
+}
+
+class Subject {
   private _target: number = 0
-  poll: Array<Observer> = []
+  public observers: ObserverList
+
+  constructor() {
+    this.observers = new ObserverList()
+  }
 
   get target(): number { return this._target }
   set target(val: number) {
     const old = this._target
     this._target = val
     if (old === val || val === 0) return
+    this.notify(val)
+  }
+
+  add(callback: Function) {
+    const ob = new Observer(callback, this)
+    this.observers.add(ob)
+  }
+
+  remove(observer: Observer) { this.observers.remove(observer) }
+
+  notify(val: number) {
     let i = 0
-    while (i < this.poll.length) {
-      const p: Observer = this.poll[i]
+    while (i < this.observers.length) {
+      const p: Observer = this.observers.select(i)
       if (p.listener) {
         if (p.timestamp < val) {
           p.abort()
-          this.poll.splice(i, 1)
+          this.observers.remove(p)
         } else if (p.timestamp === val) {
           p.succ()
-          this.poll.splice(i, 1)
+          this.observers.remove(p)
         } else {
           i++
         }
@@ -68,25 +103,18 @@ class EventPoll {
     }
   }
 
-  subscribe(cb: Function) {
-    const observer = new Observer(cb, this)
-    this.poll.push(observer)
-  }
-
   reset() {
-    while (this.poll.length > 0) {
-      const p: Observer = <Observer>this.poll.shift()
-      if (p.listener) { p.abort() }
-    }
+    this.observers.clean()
     this.target = 0
     Board.el.innerHTML = ''
   }
 
+
 }
 
 export default function () {
-  const epoll = new EventPoll()
-  Race.addEventListener('click', _ => epoll.subscribe(() => console.log('获奖者当然要接受赛后采访啦！')))
-  Reset.addEventListener('click', _ => epoll.reset())
+  const subject = new Subject()
+  Race.addEventListener('click', _ => subject.add((ob: Observer) => Board.console('获奖者当然要接受赛后采访啦！', ob.color)))
+  Reset.addEventListener('click', _ => subject.reset())
 }
 

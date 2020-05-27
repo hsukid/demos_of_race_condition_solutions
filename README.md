@@ -47,7 +47,7 @@ public creator(): void {
   Board.console(`${this.timestamp} 收到起跑指令，开始出击！</span>`, this.color)
   this.listener = window.setTimeout((t: string) => {
     Board.console(t, this.color)
-    this.ep.target = this.timestamp
+    this.subject.target = this.timestamp
   }, 10000 * Math.random(), `----- ${this.timestamp} 抵达终点！ ----`)
 }
 ```
@@ -57,30 +57,16 @@ public creator(): void {
 ```
 // blablabla...
 set target(val: number) {
-    const old = this._target
-    this._target = val
-    if (old === val || val === 0) return
-    let i = 0
-    while (i < this.poll.length) {
-      const p: Observer = this.poll[i]
-      if (p.listener) {
-        if (p.timestamp < val) {
-          p.abort()
-          this.poll.splice(i, 1)
-        } else if (p.timestamp === val) {
-          p.succ()
-          this.poll.splice(i, 1)
-        } else {
-          i++
-        }
-      }
-    }
-  }
+  const old = this._target
+  this._target = val
+  if (old === val || val === 0) return
+  this.notify(val)
+}
 
-  subscribe(cb: Function) {
-    const observer = new Observer(cb, this)
-    this.poll.push(observer)
-  }
+add(callback: Function) {
+  const ob = new Observer(callback, this)
+  this.observers.add(ob)
+}
 
 ```
 
@@ -101,7 +87,7 @@ public succ(): void {
 
 更精简？
 ```
-Race.addEventListener('click', _ => epoll.subscribe(() => console.log('获奖者当然要接受赛后采访啦！')))
+Race.addEventListener('click', _ => subject.add(() => console.log('获奖者当然要接受赛后采访啦！')))
   
 ```
 
