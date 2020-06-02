@@ -1,6 +1,7 @@
 
 // import init from './demo_1'
-import init from './demo_2'
+// import init from './demo_2'
+import init from './demo_3'
 
 
 
